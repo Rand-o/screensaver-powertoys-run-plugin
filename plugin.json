@@ -1,0 +1,18 @@
+{
+  "ID": "5A6E5384F5BF4932AD3E29442A4EC976",
+  "Name": "Screensaver",
+  "Type": "Plugin",
+  "Description": "Start the Windows screensaver",
+  "Author": "admin",
+  "Version": "1.0.0",
+  "Language": "csharp",
+  "Website": "https://aka.ms/powertoys",
+  "ActionKeyword": "scr",
+  "IsGlobal": false,
+  "ExecuteFileName": "Community.PowerToys.Run.Plugin.Screensaver.dll",
+  "AssemblyPath": "Community.PowerToys.Run.Plugin.Screensaver.dll",
+  "IcoPathDark": "Images/icon.png",
+  "IcoPathLight": "Images/icon.png",
+  "IcoPath": "Images/icon.png",
+  "DynamicLoading": false
+}

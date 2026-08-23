@@ -48,7 +48,12 @@ Windows' own idle trigger does.
    screensaver configured in Windows Settings).
 2. Launch it with argument `/s` via
    `Process.Start(new ProcessStartInfo { FileName = scrPath, Arguments = "/s", UseShellExecute = true })`.
-3. Return `true` from the action (PowerToys Run hides).
+3. Return `true` (PowerToys Run hides).
+
+Wiring: the action is the `Result.Action` property (`Func<ActionContext, bool>`)
+set on the `Result` returned from `Query()`. The host invokes `Result.Action`
+on Enter — it is the only action hook in the API (there is no separate
+`Action` method on the plugin class).
 
 Launching `<SCRNSAVE.EXE> /s` is byte-for-byte what Windows' own idle trigger
 does. The "display logon screen on resume" behavior is implemented by the
@@ -91,6 +96,10 @@ screensaver-plugin/
 ### Target framework and build
 
 - TFM: `net9.0-windows`, `Platforms: x64;ARM64`, `PlatformTarget: $(Platform)`.
+  (The current-main official checklist mentions `net10.0-windows10.0.22621.0`,
+  but the 0.97.0 Dependencies package bundles net9.0 DLLs and the build box
+  carries the .NET 9 SDK — net9.0-windows is the matching, loadable choice.
+  A net9.0 plugin assembly loads fine under newer host runtimes.)
 - `UseWPF=true` (required by the plugin API surface),
   `EnableWindowsTargeting=true` (enables building on Linux).
 - .NET 9 SDK installed on the Linux build box via the official
@@ -133,8 +142,11 @@ public class Main : IPlugin
 }
 ```
 
-- The class name `Main` is what the host discovers (convention).
-- `PluginID` must equal the `ID` in `plugin.json`.
+- The host discovers *any* class in the assembly implementing `IPlugin`
+  (it scans loaded types, not by name); the class name `Main` is the official
+  checklist naming convention, which we follow.
+- `PluginID` must equal the `ID` in `plugin.json` — the host reads it via
+  reflection and rejects the plugin if it is missing or mismatched.
 
 ### plugin.json
 
@@ -169,6 +181,8 @@ ignored by the deserializer):
 - One generated 256×256 PNG (`Images/icon.png`), theme-neutral (works in both
   dark and light themes), generated with Python (Pillow) at implementation
   time. Motif: a monitor screen with a moon/stars or "Zz" sleep symbol.
+- Prerequisite: Pillow must be available on the build box
+  (`pip install pillow` if missing).
 - Referenced by `IcoPathDark`, `IcoPathLight`, `IcoPath`, and the `Result`.
 
 ## Build process (Linux)
@@ -178,13 +192,14 @@ ignored by the deserializer):
    dotnet build Community.PowerToys.Run.Plugin.Screensaver.csproj -c Release -p:Platform=x64
    dotnet build Community.PowerToys.Run.Plugin.Screensaver.csproj -c Release -p:Platform=ARM64
    ```
-2. `build.sh` assembles the install folder:
+2. `build.sh` assembles the install folder from the **x64** build output:
    - `dist/Screensaver/` ← plugin DLL, `plugin.json`, `Images/`, and the
      bundled API DLLs (already copied to the build output by the NuGet
      package's targets).
    - `dist/Screensaver.zip` ← zipped folder for easy transfer.
-3. The x64 build is the primary artifact (target machine is x64 Windows 11);
-   the ARM64 build is produced for completeness at no extra cost.
+3. The ARM64 build is a compile-check only (its output is not packaged); the
+   x64 build is the sole distributed artifact (target machine is x64
+   Windows 11).
 
 ## Installation (Windows 11)
 

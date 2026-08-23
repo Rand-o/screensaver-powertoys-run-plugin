@@ -38,9 +38,10 @@ only), then produces:
 
 ## Notes
 
-- "Display logon screen on resume" is honored: that behavior is implemented
-  by the screensaver itself (it reads `ScreenSaverIsSecure` and locks the
-  workstation on wake), so any screensaver that supports it — all built-in
-  Windows 11 screensavers do — behaves exactly as under the system idle
-  trigger. The plugin never calls `LockWorkStation()` itself.
+- The workstation locks on resume: after the screensaver starts, the plugin
+  waits for it to exit and then calls `LockWorkStation()` (user32). A
+  programmatically-started screensaver does not reliably produce the "display
+  logon screen on resume" lock on its own, so the plugin locks explicitly.
+  This locks unconditionally (it does not depend on the `ScreenSaverIsSecure`
+  registry toggle).
 - Targets `net9.0-windows`; requires a .NET 9-era PowerToys (0.9x).

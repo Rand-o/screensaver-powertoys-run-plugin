@@ -14,8 +14,8 @@ Windows' own idle trigger does.
 ## Goals
 
 - One result, one action: start the system screensaver.
-- Preserve system screensaver behavior, including the
-  "display logon screen on resume" setting (`ScreenSaverIsSecure`).
+- Lock the workstation on resume (the "display logon screen on resume"
+  behavior) — a must-have for this plugin.
 - Buildable on Linux (cross-compile to Windows) with no Windows machine in the
   loop.
 - Installable by copying one folder into the PowerToys Run user plugin
@@ -49,18 +49,28 @@ Windows' own idle trigger does.
 2. Launch it with argument `/s` via
    `Process.Start(new ProcessStartInfo { FileName = scrPath, Arguments = "/s", UseShellExecute = true })`.
 3. Return `true` (PowerToys Run hides).
+4. On a background task, wait for the screensaver process to exit, then call
+   `LockWorkStation()` (user32) so the workstation is locked when the user
+   resumes.
 
 Wiring: the action is the `Result.Action` property (`Func<ActionContext, bool>`)
 set on the `Result` returned from `Query()`. The host invokes `Result.Action`
 on Enter — it is the only action hook in the API (there is no separate
 `Action` method on the plugin class).
 
-Launching `<SCRNSAVE.EXE> /s` is byte-for-byte what Windows' own idle trigger
-does. The "display logon screen on resume" behavior is implemented by the
-screensaver itself (it reads `ScreenSaverIsSecure` and calls
-`LockWorkStation()` on wake), so it is preserved automatically for any
-screensaver that implements it (all built-in Windows 11 screensavers do).
-The plugin does not need to — and must not — call `LockWorkStation()` itself.
+Launching `<SCRNSAVE.EXE> /s` is what Windows' own idle trigger does to start
+the screensaver. However, the "display logon screen on resume" lock is only
+reliably produced for the system idle trigger; a screensaver started
+programmatically does not reliably lock on resume. The plugin therefore calls
+`LockWorkStation()` (user32) itself once the screensaver process exits, so the
+workstation is locked whenever the user resumes. This locks unconditionally
+(independent of the `ScreenSaverIsSecure` registry toggle), because the lock on
+resume is a must-have for this plugin.
+
+> **Correction (2026-08-22):** the original design assumed the screensaver
+> locks itself on resume and that the plugin "must not" call
+> `LockWorkStation()`. In practice a programmatically-started screensaver does
+> not reliably produce the resume lock, so the plugin now locks explicitly.
 
 ### Error handling
 

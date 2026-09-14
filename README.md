@@ -5,14 +5,43 @@ that starts the Windows system screensaver.
 
 Type `scr` in PowerToys Run, press Enter, and the screensaver configured in
 Windows Settings launches — exactly the way Windows' own idle trigger does.
+Before starting, it silently turns off Caffeine and PowerToys Awake so they
+cannot dismiss the screensaver.
 
 ## How it works
 
 - Action keyword: `scr`
+- Silently deactivates Caffeine and PowerToys Awake (see below)
 - Reads `SCRNSAVE.EXE` from `HKCU\Control Panel\Desktop`
 - Launches `<SCRNSAVE.EXE> /s` (the same command line Windows uses on idle)
 - If no screensaver is configured (or the file is missing), shows a
   notification and leaves Run open
+
+## Keep-awake tools are switched off first (silently)
+
+Caffeine (Zhorn) and PowerToys Awake keep the display awake via
+`SetThreadExecutionState`, which cancels a screensaver a moment after it
+appears — so with `caff on` active the screensaver never survives. `scr` does
+the equivalent of `caff off` before launching, using the exact same mechanism
+as the [caffeine-plugin](../caffeine-plugin):
+
+| Tool | What `scr` does |
+| --- | --- |
+| Caffeine | relaunches `%USERPROFILE%\Music\caffeine64.exe` with `-appoff` (only when an instance is running; it stays in the tray, inactive) |
+| PowerToys Awake | writes `mode: 0` (PASSIVE) into the Awake module's settings file — the channel PowerToys' own AwakeService watches; no process is started or closed |
+
+**No popup, no notification, no message** — unlike `caff off`, nothing is shown
+to the user. Successes and failures only go to the log (see *Diagnose where the
+time goes*), and the screensaver starts regardless of whether the switch-off
+worked.
+
+When Awake has to change from an active mode, the plugin waits 300 ms for the
+running `PowerToys.Awake.exe` to apply the settings file (~25 ms throttle) before
+launching the screensaver; that is the only added latency, and it is skipped
+when nothing was active.
+
+The switch-off is **not undone** afterwards: Caffeine and Awake stay off, just
+like after `caff off`. Re-enable them with `caff on` / `caff awake on`.
 
 ## Building (Linux cross-compile)
 
@@ -76,9 +105,13 @@ The plugin itself already uses the fastest launch path available: a direct
 Every launch appends one line to `%TEMP%\screensaver-plugin\launch.log`:
 
 ```
-2026-01-01 12:00:00.123 scr="C:\Windows\System32\Mystify.scr" pid=1234 registry=+1ms process=+42ms window=+2310ms
+2026-01-01 12:00:00.123 scr="C:\Windows\System32\Mystify.scr" pid=1234 registry=+1ms keepawake=+350ms(caffeine:off,awake:off) process=+392ms window=+2310ms
 ```
 
+- `keepawake` — what the silent `caff off` did: `caffeine:off|not-running|not-found|error`,
+  `awake:off|already-off|not-installed|error`. Values other than `off`/
+  `not-running`/`already-off` mean the tool could not be deactivated and may
+  interrupt the screensaver.
 - `process` — time until the OS process exists (Defender/cold-cache/shell
   effects show up here).
 - `window` — time until the screensaver's fullscreen window is visible.
